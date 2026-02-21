@@ -1,22 +1,30 @@
-FROM python:3.9
+# Use a slim version to keep the image size down
+FROM python:3.9-slim
+
+# Set environment variables to optimize Python behavior
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/backend
 
-COPY requirements.txt /app/backend
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y gcc default-libmysqlclient-dev pkg-config \
+# Install system dependencies
+# Combined into one RUN to keep image layers small
+RUN apt-get update && apt-get install -y \
+    gcc \
+    default-libmysqlclient-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
+# Copying requirements first allows Docker to cache this layer
+COPY requirements.txt .
+RUN pip install --no-cache-dir mysqlclient \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Install app dependencies
-RUN pip install mysqlclient
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . /app/backend
+# Copy the rest of the application code
+COPY . .
 
 EXPOSE 8000
 
-CMD python /app/backend/manage.py runserver 0.0.0.0:8000 
-#RUN python manage.py migrate
-#RUN python manage.py makemigrations
+# Use a shell script or a combined command for migrations and server start
+CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
